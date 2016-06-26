@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html ng-app="PowerPlanDisplay" ng-controller="PowerPlanDisplayCtrl">
+    <head>
+        <meta charset="UTF-8" />
+        <title ng-bind-template="{{ powerplandisplay.sys.name }}"></title>
+
+        <link href="/favicon.ico" rel="shortcut icon" />
+
+        <script src="/js/socketio.js"></script>
+
+        <script src="/js/angular.js"></script>
+        <script src="/js/angular-sanitize.js"></script>
+        <script src="/js/angular-animate.js"></script>
+
+        <script src="/js/select.js"></script>
+
+        <script src="/js/index.js"></script>
+
+        <link href="https://fonts.googleapis.com/css?family=Cabin:400,700,700italic,400italic" rel="stylesheet" type="text/css">
+
+        <link href="/css/index.css" rel="stylesheet" type="text/css" />
+    </head>
+
+    <body>
+        <!-- full theme -->
+        <div ng-if="powerplandisplay.config.theme == 'full'" data-theme="full">
+            <header>
+                <h1>
+                    {{ powerplandisplay.sys.name }}
+                </h1>
+            </header>
+
+            <form>
+                <ui-select ng-model="selected" theme="selectize" search-enabled="false" on-select="changeActivePowerplan($item)">
+                    <ui-select-match>
+                        <span class="name" ng-bind-html="activePowerplan.value.name"></span>
+
+                    <span class="active">
+                        Active
+                    </span>
+                    </ui-select-match>
+
+                    <ui-select-choices repeat="powerplan.guid as powerplan in powerplans" ui-disable-choice="powerplan.guid == activePowerplan.value.guid">
+                        <span class="name" ng-bind-html="powerplan.name"></span>
+
+                    <span class="active" ng-if="powerplan.guid == activePowerplan.value.guid">
+                        Active
+                    </span>
+                    </ui-select-choices>
+                </ui-select>
+            </form>
+        </div>
+
+        <!-- compact theme -->
+        <div ng-if="powerplandisplay.config.theme == 'compact'" data-theme="compact">
+            <ul>
+                <li ng-repeat="powerplan in powerplans">
+                    <button ng-disabled="powerplan.guid == activePowerplan.value.guid" ng-click="changeActivePowerplan(powerplan)">
+                        {{ powerplan.name }}
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </body>
+</html>

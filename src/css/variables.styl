@@ -1,0 +1,51 @@
+// variables
+basesize = 18px
+
+
+// typography
+fontCabin = 'Cabin', sans-serif
+
+
+// viewport breakpoints
+hd = 1920px
+laptop = 1600px
+tablet = 1440px
+phone = 1000px
+mini = 767px
+tiny = 410px
+
+
+// colors
+colorBlack = black
+colorActive = #4f92ff
+colorWhite = white
+
+
+
+
+// mixins
+rem(val) {
+    font-size val
+    font-size (val / basesize)rem
+}
+
+
+mq(width, maxmin = 'max') {
+    if (width == tiny) {
+        @media screen and ({maxmin}-width: width) and ({maxmin}-height: width) {
+            {block}
+        }
+
+    } else {
+        @media screen and ({maxmin}-width: width) {
+            {block}
+        }
+    }
+}
+
+
+mq_h(height, maxmin = 'max') {
+    @media screen and ({maxmin}-height: height) {
+        {block}
+    }
+}

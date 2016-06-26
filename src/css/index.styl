@@ -1,0 +1,177 @@
+@require "variables"
+@require "animation"
+@require "select"
+
+@import "jeet"
+
+
+* {
+    box-sizing border-box
+}
+
+
+
+html {
+    overflow hidden
+
+    -webkit-font-smoothing antialiased
+    font-size basesize
+}
+
+
+html,
+body {
+    height 100vh
+    margin 0
+    padding 0
+
+    background black
+    color white
+    font-family fontCabin
+}
+
+
+
+
+// full theme
+[data-theme="full"] {
+    header {
+        position relative
+
+        h1 {
+            margin 0
+            padding 10px 14px
+            color white
+            rem 40px
+        }
+    }
+
+    form {
+        padding 14px
+    }
+}
+
+
+
+
+// compact theme
+[data-theme="compact"] {
+    ul {
+        list-style none
+        margin 0 10px
+        padding 0
+        text-align center
+
+        li {
+            display inline-block
+            padding 10px 0 0 10px
+
+            &:first-child {
+                padding-left 0
+            }
+
+            button {
+                background colorBlack
+                color colorWhite
+                padding 6px 10px
+                font-family fontCabin
+                rem 20px
+                border 2px solid colorWhite
+                cursor pointer
+
+                &:hover,
+                &:focus {
+                    background colorActive
+                    border-color colorActive
+                    outline none
+                }
+
+                &[disabled] {
+                    background colorWhite
+                    border-color colorWhite
+                    color colorBlack
+                }
+            }
+        }
+    }
+}
+
+
+
+
+// animations
+.animate {
+    animation-duration 1s
+    animation-fill-mode both
+
+    &.infinite {
+        animation-iteration-count infinite
+    }
+
+    &.hinge {
+        animation-duration 2s
+    }
+
+    &.flipOutX,
+    &.flipOutY,
+    &.bounceIn,
+    &.bounceOut {
+        animation-duration 0.75s
+    }
+
+
+    &.bounceInOutVert {
+        &.ng-enter {
+            animation-name bounceInDown
+            animation-timing-function ease-in
+        }
+        &.ng-leave {
+            animation-name bounceOutUp
+            animation-timing-function ease-out
+        }
+    }
+
+    &.lightSpeedInOutHoriz {
+        &.ng-enter {
+            animation-name lightSpeedIn
+            animation-timing-function ease-in
+        }
+        &.ng-leave {
+            animation-name lightSpeedOut
+            animation-timing-function ease-out
+        }
+    }
+
+    &.flipInOutVert {
+        &.ng-enter {
+            animation-name flipInX
+            animation-timing-function ease-in
+            backface-visibility visible !important
+        }
+        &.ng-leave {
+            animation-name flipOutX
+            animation-timing-function ease-out
+            backface-visibility visible !important
+        }
+    }
+
+    &.fadeInOut {
+        transition all 0.5s linear
+
+        &.ng-enter {
+            opacity 0
+
+            &.ng-enter-active {
+                opacity 1
+            }
+        }
+
+        &.ng-leave {
+            opacity 1
+
+            &.ng-leave-active {
+                opacity 0
+            }
+        }
+    }
+}
