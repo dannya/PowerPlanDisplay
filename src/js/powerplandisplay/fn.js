@@ -13,6 +13,7 @@
 
 // imports
 const Promise       = require('bluebird'),
+      execSync      = require('child_process').execSync,
       execAsync     = Promise.promisify(require('child_process').exec),
       trim          = require('trim-character'),
       electron      = require('electron'),
@@ -21,6 +22,34 @@ const Promise       = require('bluebird'),
 
 // exported functions
 var fn = {
+    _parsePowerPlan: function (string) {
+        var powerplan   = string.split('  '),
+            guid        = powerplan[0].split(': ')[1],
+            name        = trim.right(powerplan[1], '\r'),
+            active      = false,
+            hidden      = (powerplandisplay.hiddenPowerPlans.indexOf(guid) === -1);
+
+        // determine if plan is active
+        if (name.slice(-1) === '*') {
+            active  = true;
+            name    = trim.right(name, ' *');
+        }
+
+        // return parsed data
+        return {
+            guid:   guid,
+            name:   trim.left(
+                trim.right(
+                    name,
+                    ')'
+                ),
+                '('
+            ),
+            active: active,
+            hidden: hidden
+        };
+    },
+
     getPowerPlans: function () {
         return new Promise(
             function (resolve, reject) {
@@ -36,34 +65,54 @@ var fn = {
                                     continue;
                                 }
     
-                                var powerplan   = tabular[i].split('  '),
-                                    guid        = powerplan[0].split(': ')[1],
-                                    name        = trim.right(powerplan[1], '\r'),
-                                    active      = false;
-    
-                                // determine if plan is active
-                                if (name.slice(-1) === '*') {
-                                    active  = true;
-                                    name    = trim.right(name, ' *');
-                                }
-    
                                 // add to powerplans data structure
-                                powerplans.push({
-                                    guid:   guid,
-                                    name:   trim.left(
-                                        trim.right(
-                                            name,
-                                            ')'
-                                        ),
-                                        '('
-                                    ),
-                                    active: active
-                                });
+                                powerplans.push(
+                                    fn._parsePowerPlan(
+                                        tabular[i]
+                                    )
+                                );
                             }
     
                             // send powerplans
                             resolve(
                                 powerplans
+                            );
+                        }
+                    )
+                    .catch(
+                        reject
+                    );
+            }
+        );
+    },
+
+    getPowerPlansSync: function () {
+        var data = execSync(
+            'powercfg /list',
+            {
+                encoding: 'utf-8'
+            }
+        );
+
+        // split tabular data into individual power plan items, strip off header
+        var tabular = data.split('\n').slice(3);
+
+        // reassemble into string and change elements
+        var output = tabular.join('\n').replace(/(\()|(\))/g, '').replace('*', '(Active)');
+
+        return output;
+    },
+
+    getActivePowerPlan: function () {
+        return new Promise(
+            function (resolve, reject) {
+                execAsync('powercfg /getactivescheme')
+                    .then(
+                        function (string) {
+                            resolve(
+                                fn._parsePowerPlan(
+                                    string
+                                )
                             );
                         }
                     )
@@ -90,14 +139,17 @@ var fn = {
     
     createWindow: function () {
         // create the browser window
+        var sizingKey = ((powerplandisplay.config.frame === true) ? 'frame' : 'noframe');
+
         var win = new electron.BrowserWindow({
-            width:          powerplandisplay.config.windowedWidth,
-            height:         powerplandisplay.config.windowedHeight,
-            minWidth:       300,
-            minHeight:      100,
-            alwaysOnTop:    (powerplandisplay.config.notOnTop === false) && (powerplandisplay.config.debug === false),
+            width:          powerplandisplay.themes[powerplandisplay.config.theme][sizingKey].width,
+            height:         powerplandisplay.themes[powerplandisplay.config.theme][sizingKey].height,
+            minWidth:       200,
+            minHeight:      40,
+            alwaysOnTop:    ((powerplandisplay.config.notOnTop === false) && (powerplandisplay.config.debug === false)),
             darkTheme:      true,
             fullscreen:     false,
+            frame:          (powerplandisplay.config.frame === true),
             titleBarStyle:  'hidden',
             webPreferences: {
                 zoomFactor:                 1.0,
@@ -107,7 +159,7 @@ var fn = {
                 experimentalFeatures:       true,
                 experimentalCanvasFeatures: true
             },
-            title:          powerplandisplay.sys.name + ' ' + powerplandisplay.sys.version
+            title:          powerplandisplay.sys.name + ' v' + powerplandisplay.sys.version
         });
 
         // load the specified URL, otherwise the local mirror / config HTML file
@@ -129,6 +181,16 @@ var fn = {
             'page-title-updated',
             function (event) {
                 event.preventDefault();
+            }
+        );
+
+        // open external links in browser
+        win.webContents.on(
+            'new-window',
+            function (event, url) {
+                event.preventDefault();
+
+                electron.shell.openExternal(url);
             }
         );
 

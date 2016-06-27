@@ -1,4 +1,5 @@
+/screenshots
 /app
 /.idea
 /node_modules
-
+/config_editable.js

@@ -1,7 +1,9 @@
+var fs = require('fs');
 var argv = require('yargs').argv;
 var runSequence = require('run-sequence');
 var gulp = require('gulp');
 var gulpif = require('gulp-if');
+var strip = require('gulp-strip-comments');
 var clean = require('gulp-clean');
 var replace = require('gulp-replace');
 var stylus = require('gulp-stylus');
@@ -69,7 +71,6 @@ gulp.task('scripts_main', function () {
         .pipe(gulp.dest('app/js'));
 });
 
-
 gulp.task('scripts_ondemand', function () {
     gulp
         .src([
@@ -114,6 +115,20 @@ gulp.task('transfer_pages', function () {
     gulp
         .src('src/*.html')
         .pipe(gulp.dest('app'));
+});
+
+
+gulp.task('create_config', function () {
+    // create editable config (if doesn't already exist)
+    if (!fs.existsSync('config_editable.js')) {
+        gulp
+            .src('config.js')
+            .pipe(strip())
+            .pipe(
+                rename('config_editable.js')
+            )
+            .pipe(gulp.dest('.'));
+    }
 });
 
 
@@ -177,6 +192,7 @@ gulp.task(
         runSequence(
             'clean',
             'default',
+            'create_config',
             callback
         );
     }

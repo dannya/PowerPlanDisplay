@@ -14,6 +14,7 @@
 // imports
 const electron  = require('electron'),
       nomnom    = require('nomnom'),
+      repeat    = require('repeat'),
       http      = require('http'),
       path      = require('path'),
       url       = require('url'),
@@ -31,9 +32,21 @@ const app = electron.app;
 let win, powersave;
 
 
-// load package and config
+// load package information
 const pkg = require('./package.json');
-const powerplandisplay = require('./config');
+
+
+// load config
+var powerplandisplay;
+
+try {
+    // load custom config if available
+    powerplandisplay = require('./config_editable');
+
+} catch (e) {
+    // ...otherwise load standard shipped config
+    powerplandisplay = require('./config');
+}
 
 
 // make powerplandisplay framework available globally
@@ -44,14 +57,41 @@ global.powerplandisplay = powerplandisplay;
 powerplandisplay.sys = {
     rootDir:    __dirname,
     name:       pkg.name,
-    version:    pkg.version
+    version:    pkg.version,
+    homepage:   pkg.homepage
 };
 
-powerplandisplay.moduleInstances = {};
+
+// define function to get full / minified file based on debug flag
+powerplandisplay.path = function (pathItems, injectMin, alwaysInjectMin) {
+    pathItems.unshift(
+        powerplandisplay.sys.rootDir, 'app'
+    );
+
+    // inject '.min' into filename?
+    if (alwaysInjectMin || (!powerplandisplay.config.debug && (injectMin !== false))) {
+        pathItems[pathItems.length - 1] = pathItems[pathItems.length - 1].replace('.', '.min.');
+    }
+
+    return path.join.apply(this, pathItems);
+};
+
+
+// load utility functions
+powerplandisplay.fn = require(
+    powerplandisplay.path(
+        [
+            'js', 'powerplandisplay', 'fn.js'
+        ],
+        true,
+        true
+    )
+);
 
 
 // define command line arguments
 const staticConfigOptions = {
+    // configuration
     debug: {
         abbr:       'd',
         flag:       true,
@@ -70,28 +110,51 @@ const staticConfigOptions = {
         default:    false,
         help:       'Do not force the window to be on top of other windows'
     },
-    version: {
-        abbr:       'v',
-        flag:       true,
-        help:       'Print version and exit',
-        callback: function () {
-            return powerplandisplay.sys.name + ' ' + powerplandisplay.sys.version;
-        }
-    },
     showWindow: {
         abbr:       's',
         default:    true,
         help:       'Show the app GUI in a window (if disabled, this will only be accessible via a web browser)'
     },
+    frame: {
+        abbr:       'f',
+        flag:       true,
+        default:    true,
+        help:       'Whether to show the frame containing the window controls'
+    },
     port: {
-        abbr:       'p',
         default:    80,
         help:       'Local port number that interface is served from'
+    },
+    refresh: {
+        abbr:       'r',
+        default:    5,
+        help:       'Number of seconds to recheck for external powerplan changes'
     },
     theme: {
         abbr:       't',
         default:    'full',
+        choices:    [
+            'full', 'compact'
+        ],
         help:       'Display theme'
+    },
+    version: {
+        abbr:       'v',
+        flag:       true,
+        help:       'Print version and exit',
+        callback: function () {
+            return powerplandisplay.sys.name + ' v' + powerplandisplay.sys.version;
+        }
+    },
+    
+    // functionality
+    powerplans: {
+        abbr:       'p',
+        flag:       true,
+        help:       'List available powerplans',
+        callback: function () {
+            return powerplandisplay.fn.getPowerPlansSync();
+        }
     }
 };
 
@@ -119,14 +182,24 @@ var isDebug = configCommandLine['debug'] ? configCommandLine['debug'] : staticCo
 powerplandisplay.sys.minified = (powerplandisplay.config.debug === false) ? '.min' : '';
 
 
-// check for split debug / production config
+// check for split debug / production config...
 if ((typeof staticConfig.debug === 'object') && (typeof staticConfig.production === 'object')) {
+    // choose config based on specified flag
     if (isDebug) {
         powerplandisplay.config = staticConfig.debug;
         powerplandisplay.config.debug = true;
 
     } else {
         powerplandisplay.config = staticConfig.production;
+        powerplandisplay.config.debug = false;
+    }
+
+} else {
+    // single config
+    powerplandisplay.config = staticConfig;
+
+    // set debug flag if it doesn't exist
+    if (powerplandisplay.config.debug === undefined) {
         powerplandisplay.config.debug = false;
     }
 }
@@ -145,39 +218,6 @@ for (var key in configCommandLine) {
         }
     }
 }
-
-
-// define function to get full / minified file based on debug flag
-powerplandisplay.path = function (pathItems, injectMin) {
-    pathItems.unshift(
-        powerplandisplay.sys.rootDir, 'app'
-    );
-
-    // inject '.min' into filename?
-    if (!powerplandisplay.config.debug && (injectMin !== false)) {
-        pathItems[pathItems.length - 1] = pathItems[pathItems.length - 1].replace('.', '.min.');
-    }
-
-    return path.join.apply(this, pathItems);
-};
-
-
-// load utility functions
-powerplandisplay.fn = require(
-    powerplandisplay.path(
-        [
-            'js', 'powerplandisplay', 'fn.js'
-        ]
-    )
-);
-
-
-// initialise data storage
-powerplandisplay.data = {
-    powerplans: []
-};
-
-
 
 
 // start serving interface via URL's
@@ -275,22 +315,6 @@ ipc.on(
         socket.on(
             'initialise',
             function (context) {
-                // request powerplans, and send to browser when received
-                powerplandisplay.fn.getPowerPlans()
-                    .then(
-                        function (powerplans) {
-                            // send powerplan data to browser
-                            socket.emit(
-                                'setData',
-                                {
-                                    keyPath:    ['powerplans'],
-                                    data:       powerplans
-                                }
-                            );
-                        }
-                    );
-
-
                 // add context powerplandisplay into object
                 powerplandisplay.context = context;
 
@@ -303,6 +327,27 @@ ipc.on(
                         data:       powerplandisplay
                     }
                 );
+
+
+                // request powerplans (every n seconds to catch external powerplan changes), and send to web page context when received
+                repeat(
+                    function () {
+                        powerplandisplay.fn.getPowerPlans()
+                            .then(
+                                function (powerplans) {
+                                    // send powerplan data to browser
+                                    socket.emit(
+                                        'setData',
+                                        {
+                                            keyPath:    ['powerplans'],
+                                            data:       powerplans
+                                        }
+                                    );
+                                }
+                            );
+                    }
+
+                ).every(powerplandisplay.config.refresh, 's').start.now();
             }
         );
 
