@@ -1,4 +1,5 @@
+/app/node_modules
 /screenshots
 /.idea
+/dist
 /node_modules
-/config_editable.js

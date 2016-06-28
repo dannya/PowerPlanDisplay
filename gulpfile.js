@@ -117,15 +117,14 @@ gulp.task('transfer_pages', function () {
         .pipe(gulp.dest('app'));
 });
 
-
-gulp.task('create_config', function () {
+gulp.task('transfer_config', function () {
     // create editable config (if doesn't already exist)
     if (!fs.existsSync('config_editable.js')) {
         gulp
-            .src('config.js')
+            .src('app/config.js')
             .pipe(strip())
             .pipe(
-                rename('config_editable.js')
+                rename('app/config_editable.js')
             )
             .pipe(gulp.dest('.'));
     }
@@ -177,7 +176,13 @@ gulp.task(
     function () {
         return gulp
             .src(
-                'app',
+                [
+                    'app/css',
+                    'app/img',
+                    'app/js',
+                    'app/favicon.ico',
+                    'app/index.html'
+                ],
                 {
                     read: false
                 }
@@ -192,7 +197,7 @@ gulp.task(
         runSequence(
             'clean',
             'default',
-            'create_config',
+            'transfer_config',
             callback
         );
     }

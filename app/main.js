@@ -21,11 +21,72 @@ const electron  = require('electron'),
       fs        = require('fs'),
       os        = require('os'),
       mime      = require('mime'),
+      spawn     = require('child_process').spawn,
       io        = require('socket.io');
 
 
 // define module shorthand names
 const app = electron.app;
+
+
+// determine if running in Squirrel or Electron context
+const context = ((process.execPath.indexOf('electron')) === -1) ? 'squirrel' : 'electron';
+
+
+// process squirrel events?
+if (context === 'squirrel') {
+    var runSquirrelCmd = function(args, done) {
+        spawn(
+            path.resolve(
+                path.dirname(process.execPath), '..', 'Update.exe'
+            ),
+            args,
+            {
+                detached: true
+            }
+
+        ).on('close', done);
+    };
+
+    var handleStartupEvent = function() {
+        if (process.platform !== 'win32') {
+            return false;
+        }
+
+        var target = path.basename(process.execPath);
+        var squirrelCommand = process.argv[1];
+
+        switch (squirrelCommand) {
+            case '--squirrel-install':
+            case '--squirrel-updated':
+                // install desktop / start menu shortcuts
+                runSquirrelCmd(
+                    ['--createShortcut=' + target + ''],
+                    app.quit
+                );
+
+                return true;
+
+            case '--squirrel-uninstall':
+                // undo anything done in --squirrel-install and --squirrel-updated handlers
+                runSquirrelCmd(
+                    ['--removeShortcut=' + target + ''],
+                    app.quit
+                );
+
+                return true;
+
+            case '--squirrel-obsolete':
+                app.quit();
+
+                return true;
+        }
+    };
+
+    if (handleStartupEvent()) {
+        return;
+    }
+}
 
 
 // keep a global reference of certain objects to stop them getting garbage collected
@@ -65,7 +126,7 @@ powerplandisplay.sys = {
 // define function to get full / minified file based on debug flag
 powerplandisplay.path = function (pathItems, injectMin, alwaysInjectMin) {
     pathItems.unshift(
-        powerplandisplay.sys.rootDir, 'app'
+        powerplandisplay.sys.rootDir
     );
 
     // inject '.min' into filename?
@@ -231,7 +292,13 @@ var server = http
                 filepath = '/index.html';
             }
 
-            filepath = './app' + filepath;
+            if (context === 'squirrel') {
+                filepath = './resources/app' + filepath;
+            } else {
+                filepath = './app' + filepath;
+            }
+
+            console.log(filepath);
 
             var extname     = path.extname(filepath),
                 contentType = 'text/html';
@@ -254,9 +321,6 @@ var server = http
 
                     break;
 
-                case '.json':
-                    contentType = 'application/json';
-                    break;
                 case '.svg':
                     contentType = 'image/svg+xml';
                     break;
